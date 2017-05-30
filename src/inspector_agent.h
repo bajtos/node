@@ -67,6 +67,14 @@ class Agent {
   void FatalException(v8::Local<v8::Value> error,
                       v8::Local<v8::Message> message);
 
+  // Async stack traces instrumentation.
+  void AsyncTaskScheduled(const v8_inspector::StringView& taskName, void* task,
+                                  bool recurring);
+  void AsyncTaskCanceled(void* task);
+  void AsyncTaskStarted(void* task);
+  void AsyncTaskFinished(void* task);
+  void AllAsyncTasksCanceled();
+
   // These methods are called by the WS protocol and JS binding to create
   // inspector sessions.  The inspector responds by using the delegate to send
   // messages back.

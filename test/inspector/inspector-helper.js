@@ -544,3 +544,38 @@ exports.mainScriptSource = function() {
 exports.markMessageNoResponse = function(message) {
   message[DONT_EXPECT_RESPONSE_SYMBOL] = true;
 };
+
+exports.debugScriptAndAssertPausedMessage = function(script, assertFn) {
+  this.startNodeForInspectorTest(runTests, '--inspect-brk', script);
+
+  function runTests(harness) {
+    // Wait for the child to start running the script
+    setTimeout(() => run(), 1000);
+
+    function run() {
+      harness.runFrontendSession([
+        setupDebugger,
+        (session) => session.expectMessages(debuggerPaused).disconnect(true)
+      ])
+        .kill();
+    }
+  }
+
+  function setupDebugger(session) {
+    session.sendInspectorCommands([
+      { 'method': 'Runtime.enable' },
+      { 'method': 'Debugger.enable' },
+      { 'method': 'Debugger.setAsyncCallStackDepth',
+        'params': {'maxDepth': 10} },
+      { 'method': 'Debugger.setBlackboxPatterns',
+        'params': {'patterns': []} },
+      { 'method': 'Runtime.runIfWaitingForDebugger' }
+    ]);
+  }
+
+  function debuggerPaused(msg) {
+    if (msg.method !== 'Debugger.paused') return;
+    assertFn(msg);
+    return true;
+  }
+};

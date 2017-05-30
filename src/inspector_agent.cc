@@ -527,6 +527,28 @@ class NodeInspectorClient : public v8_inspector::V8InspectorClient {
     return channel_.get();
   }
 
+  // Async stack traces instrumentation.
+  void AsyncTaskScheduled(const StringView& taskName, void* task,
+                                  bool recurring) {
+    client_->asyncTaskScheduled(taskName, task, recurring);
+  }
+
+  void AsyncTaskCanceled(void* task) {
+    client_->asyncTaskCanceled(task);
+  }
+
+  void AsyncTaskStarted(void* task) {
+    client_->asyncTaskStarted(task);
+  }
+
+  void AsyncTaskFinished(void* task) {
+    client_->asyncTaskFinished(task);
+  }
+
+  void AllAsyncTasksCanceled() {
+    client_->allAsyncTasksCanceled();
+  }
+
  private:
   node::Environment* env_;
   v8::Platform* platform_;
@@ -667,6 +689,27 @@ void Agent::PauseOnNextJavascriptStatement(const std::string& reason) {
   ChannelImpl* channel = client_->channel();
   if (channel != nullptr)
     channel->schedulePauseOnNextStatement(reason);
+}
+
+void Agent::AsyncTaskScheduled(const StringView& taskName, void* task,
+    bool recurring) {
+  client_->AsyncTaskScheduled(taskName, task, recurring);
+}
+
+void Agent::AsyncTaskCanceled(void* task) {
+  client_->AsyncTaskCanceled(task);
+}
+
+void Agent::AsyncTaskStarted(void* task) {
+  client_->AsyncTaskStarted(task);
+}
+
+void Agent::AsyncTaskFinished(void* task) {
+  client_->AsyncTaskFinished(task);
+}
+
+void Agent::AllAsyncTasksCanceled() {
+  client_->AllAsyncTasksCanceled();
 }
 
 void Open(const FunctionCallbackInfo<Value>& args) {
