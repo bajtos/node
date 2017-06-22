@@ -33,6 +33,7 @@
 
 using v8::Array;
 using v8::ArrayBuffer;
+using v8::Boolean;
 using v8::Context;
 using v8::Float64Array;
 using v8::Function;
@@ -461,13 +462,13 @@ static void AsyncTaskScheduled(const FunctionCallbackInfo<Value>& args) {
   if (!args[2]->IsBoolean())
     return env->ThrowTypeError("third argument must be a boolean");
 
-  Local<String> taskName = args[0]->ToString(env->context()).ToLocalChecked();
+  Local<String> taskName = args[0].As<String>();
   String::Value taskNameValue(taskName);
   StringView taskNameView(*taskNameValue, taskNameValue.length());
 
-  int64_t taskId = args[1]->IntegerValue(env->context()).FromJust();
+  intptr_t taskId = args[1].As<Integer>()->Value();
   void* task = reinterpret_cast<void*>(taskId);
-  bool recurring = args[2]->BooleanValue();
+  bool recurring = args[2].As<Boolean>()->Value();
 
   env->inspector_agent()->AsyncTaskScheduled(taskNameView, task, recurring);
 }
@@ -478,7 +479,7 @@ static void AsyncTaskCanceled(const FunctionCallbackInfo<Value>& args) {
   if (!args[0]->IsNumber())
     return env->ThrowTypeError("first argument must be a number");
 
-  int64_t taskId = args[0]->IntegerValue(env->context()).FromJust();
+  intptr_t taskId = args[0].As<Integer>()->Value();
   env->inspector_agent()->AsyncTaskCanceled(reinterpret_cast<void*>(taskId));
 }
 
@@ -488,7 +489,7 @@ static void AsyncTaskStarted(const FunctionCallbackInfo<Value>& args) {
   if (!args[0]->IsNumber())
     return env->ThrowTypeError("first argument must be a number");
 
-  int64_t taskId = args[0]->IntegerValue(env->context()).FromJust();
+  intptr_t taskId = args[0].As<Integer>()->Value();
   env->inspector_agent()->AsyncTaskStarted(reinterpret_cast<void*>(taskId));
 }
 
@@ -498,7 +499,7 @@ static void AsyncTaskFinished(const FunctionCallbackInfo<Value>& args) {
   if (!args[0]->IsNumber())
     return env->ThrowTypeError("first argument must be a number");
 
-  int64_t taskId = args[0]->IntegerValue(env->context()).FromJust();
+  intptr_t taskId = args[0].As<Integer>()->Value();
   env->inspector_agent()->AsyncTaskFinished(reinterpret_cast<void*>(taskId));
 }
 
