@@ -21,11 +21,13 @@
 namespace node {
 namespace inspector {
 namespace {
+using v8::Boolean;
 using v8::Context;
 using v8::External;
 using v8::Function;
 using v8::FunctionCallbackInfo;
 using v8::HandleScope;
+using v8::Integer;
 using v8::Isolate;
 using v8::Local;
 using v8::Maybe;
@@ -749,6 +751,56 @@ void Url(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(OneByteString(env->isolate(), url.c_str()));
 }
 
+static void AsyncTaskScheduledWrapper(const FunctionCallbackInfo<Value>& args) {
+  Environment* env = Environment::GetCurrent(args);
+
+  if (!args[0]->IsString())
+    return env->ThrowTypeError("first argument must be a string");
+  if (!args[1]->IsNumber())
+    return env->ThrowTypeError("second argument must be a number");
+  if (!args[2]->IsBoolean())
+    return env->ThrowTypeError("third argument must be a boolean");
+
+  Local<String> taskName = args[0].As<String>();
+  String::Value taskNameValue(taskName);
+  StringView taskNameView(*taskNameValue, taskNameValue.length());
+
+  intptr_t taskId = args[1].As<Integer>()->Value();
+  void* task = reinterpret_cast<void*>(taskId);
+  bool recurring = args[2].As<Boolean>()->Value();
+
+  env->inspector_agent()->AsyncTaskScheduled(taskNameView, task, recurring);
+}
+
+static void AsyncTaskCanceledWrapper(const FunctionCallbackInfo<Value>& args) {
+  Environment* env = Environment::GetCurrent(args);
+
+  if (!args[0]->IsNumber())
+    return env->ThrowTypeError("first argument must be a number");
+
+  intptr_t taskId = args[0].As<Integer>()->Value();
+  env->inspector_agent()->AsyncTaskCanceled(reinterpret_cast<void*>(taskId));
+}
+
+static void AsyncTaskStartedWrapper(const FunctionCallbackInfo<Value>& args) {
+  Environment* env = Environment::GetCurrent(args);
+
+  if (!args[0]->IsNumber())
+    return env->ThrowTypeError("first argument must be a number");
+
+  intptr_t taskId = args[0].As<Integer>()->Value();
+  env->inspector_agent()->AsyncTaskStarted(reinterpret_cast<void*>(taskId));
+}
+
+static void AsyncTaskFinishedWrapper(const FunctionCallbackInfo<Value>& args) {
+  Environment* env = Environment::GetCurrent(args);
+
+  if (!args[0]->IsNumber())
+    return env->ThrowTypeError("first argument must be a number");
+
+  intptr_t taskId = args[0].As<Integer>()->Value();
+  env->inspector_agent()->AsyncTaskFinished(reinterpret_cast<void*>(taskId));
+}
 
 // static
 void Agent::InitInspector(Local<Object> target, Local<Value> unused,
@@ -761,6 +813,11 @@ void Agent::InitInspector(Local<Object> target, Local<Value> unused,
   env->SetMethod(target, "connect", ConnectJSBindingsSession);
   env->SetMethod(target, "open", Open);
   env->SetMethod(target, "url", Url);
+
+  env->SetMethod(target, "asyncTaskScheduled", AsyncTaskScheduledWrapper);
+  env->SetMethod(target, "asyncTaskCanceled", AsyncTaskCanceledWrapper);
+  env->SetMethod(target, "asyncTaskStarted", AsyncTaskStartedWrapper);
+  env->SetMethod(target, "asyncTaskFinished", AsyncTaskFinishedWrapper);
 }
 
 void Agent::RequestIoThreadStart() {

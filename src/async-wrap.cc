@@ -29,11 +29,9 @@
 #include "uv.h"
 #include "v8.h"
 #include "v8-profiler.h"
-#include "v8-inspector.h"
 
 using v8::Array;
 using v8::ArrayBuffer;
-using v8::Boolean;
 using v8::Context;
 using v8::Float64Array;
 using v8::Function;
@@ -57,8 +55,6 @@ using v8::Symbol;
 using v8::TryCatch;
 using v8::Uint32Array;
 using v8::Value;
-
-using v8_inspector::StringView;
 
 using AsyncHooks = node::Environment::AsyncHooks;
 
@@ -452,56 +448,6 @@ static void DisablePromiseHook(const FunctionCallbackInfo<Value>& args) {
   }, static_cast<void*>(env));
 }
 
-static void AsyncTaskScheduled(const FunctionCallbackInfo<Value>& args) {
-  Environment* env = Environment::GetCurrent(args);
-
-  if (!args[0]->IsString())
-    return env->ThrowTypeError("first argument must be a string");
-  if (!args[1]->IsNumber())
-    return env->ThrowTypeError("second argument must be a number");
-  if (!args[2]->IsBoolean())
-    return env->ThrowTypeError("third argument must be a boolean");
-
-  Local<String> taskName = args[0].As<String>();
-  String::Value taskNameValue(taskName);
-  StringView taskNameView(*taskNameValue, taskNameValue.length());
-
-  intptr_t taskId = args[1].As<Integer>()->Value();
-  void* task = reinterpret_cast<void*>(taskId);
-  bool recurring = args[2].As<Boolean>()->Value();
-
-  env->inspector_agent()->AsyncTaskScheduled(taskNameView, task, recurring);
-}
-
-static void AsyncTaskCanceled(const FunctionCallbackInfo<Value>& args) {
-  Environment* env = Environment::GetCurrent(args);
-
-  if (!args[0]->IsNumber())
-    return env->ThrowTypeError("first argument must be a number");
-
-  intptr_t taskId = args[0].As<Integer>()->Value();
-  env->inspector_agent()->AsyncTaskCanceled(reinterpret_cast<void*>(taskId));
-}
-
-static void AsyncTaskStarted(const FunctionCallbackInfo<Value>& args) {
-  Environment* env = Environment::GetCurrent(args);
-
-  if (!args[0]->IsNumber())
-    return env->ThrowTypeError("first argument must be a number");
-
-  intptr_t taskId = args[0].As<Integer>()->Value();
-  env->inspector_agent()->AsyncTaskStarted(reinterpret_cast<void*>(taskId));
-}
-
-static void AsyncTaskFinished(const FunctionCallbackInfo<Value>& args) {
-  Environment* env = Environment::GetCurrent(args);
-
-  if (!args[0]->IsNumber())
-    return env->ThrowTypeError("first argument must be a number");
-
-  intptr_t taskId = args[0].As<Integer>()->Value();
-  env->inspector_agent()->AsyncTaskFinished(reinterpret_cast<void*>(taskId));
-}
 
 void AsyncWrap::GetAsyncId(const FunctionCallbackInfo<Value>& args) {
   AsyncWrap* wrap;
@@ -561,11 +507,6 @@ void AsyncWrap::Initialize(Local<Object> target,
   env->SetMethod(target, "addIdToDestroyList", QueueDestroyId);
   env->SetMethod(target, "enablePromiseHook", EnablePromiseHook);
   env->SetMethod(target, "disablePromiseHook", DisablePromiseHook);
-
-  env->SetMethod(target, "asyncTaskScheduled", AsyncTaskScheduled);
-  env->SetMethod(target, "asyncTaskCanceled", AsyncTaskCanceled);
-  env->SetMethod(target, "asyncTaskStarted", AsyncTaskStarted);
-  env->SetMethod(target, "asyncTaskFinished", AsyncTaskFinished);
 
   v8::PropertyAttribute ReadOnlyDontDelete =
       static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontDelete);
