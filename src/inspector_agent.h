@@ -69,7 +69,7 @@ class Agent {
 
   // Async stack traces instrumentation.
   void AsyncTaskScheduled(const v8_inspector::StringView& taskName, void* task,
-                                  bool recurring);
+                          bool recurring);
   void AsyncTaskCanceled(void* task);
   void AsyncTaskStarted(void* task);
   void AsyncTaskFinished(void* task);

@@ -529,7 +529,7 @@ class NodeInspectorClient : public v8_inspector::V8InspectorClient {
 
   // Async stack traces instrumentation.
   void AsyncTaskScheduled(const StringView& taskName, void* task,
-                                  bool recurring) {
+                          bool recurring) {
     client_->asyncTaskScheduled(taskName, task, recurring);
   }
 
@@ -692,7 +692,7 @@ void Agent::PauseOnNextJavascriptStatement(const std::string& reason) {
 }
 
 void Agent::AsyncTaskScheduled(const StringView& taskName, void* task,
-    bool recurring) {
+                               bool recurring) {
   client_->AsyncTaskScheduled(taskName, task, recurring);
 }
 
