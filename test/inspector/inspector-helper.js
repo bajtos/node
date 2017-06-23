@@ -549,16 +549,11 @@ exports.debugScriptAndAssertPausedMessage = function(script, assertFn) {
   this.startNodeForInspectorTest(runTests, '--inspect-brk', script);
 
   function runTests(harness) {
-    // Wait for the child to start running the script
-    setTimeout(() => run(), 1000);
-
-    function run() {
-      harness.runFrontendSession([
-        setupDebugger,
-        (session) => session.expectMessages(debuggerPaused).disconnect(true)
-      ])
-        .kill();
-    }
+    harness.runFrontendSession([
+      setupDebugger,
+      (session) => session.expectMessages(debuggerPaused).disconnect(true)
+    ])
+      .kill();
   }
 
   function setupDebugger(session) {
