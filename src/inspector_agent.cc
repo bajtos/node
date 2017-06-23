@@ -751,55 +751,51 @@ void Url(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(OneByteString(env->isolate(), url.c_str()));
 }
 
+static void invokeAsyncTaskFnWithId(void (Agent::*asyncTaskFn)(void*),
+                                    const FunctionCallbackInfo<Value>& args);
+
 static void AsyncTaskScheduledWrapper(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
   if (!args[0]->IsString())
-    return env->ThrowTypeError("first argument must be a string");
+    return env->ThrowTypeError("taskName must be a string");
   if (!args[1]->IsNumber())
-    return env->ThrowTypeError("second argument must be a number");
+    return env->ThrowTypeError("taskId must be a number");
   if (!args[2]->IsBoolean())
-    return env->ThrowTypeError("third argument must be a boolean");
+    return env->ThrowTypeError("recurring must be a boolean");
 
   Local<String> taskName = args[0].As<String>();
   String::Value taskNameValue(taskName);
   StringView taskNameView(*taskNameValue, taskNameValue.length());
 
-  intptr_t taskId = args[1].As<Integer>()->Value();
-  void* task = reinterpret_cast<void*>(taskId);
+  intptr_t task_id = args[1].As<Integer>()->Value();
+  void* task = reinterpret_cast<void*>(task_id);
   bool recurring = args[2].As<Boolean>()->Value();
 
   env->inspector_agent()->AsyncTaskScheduled(taskNameView, task, recurring);
 }
 
 static void AsyncTaskCanceledWrapper(const FunctionCallbackInfo<Value>& args) {
-  Environment* env = Environment::GetCurrent(args);
-
-  if (!args[0]->IsNumber())
-    return env->ThrowTypeError("first argument must be a number");
-
-  intptr_t taskId = args[0].As<Integer>()->Value();
-  env->inspector_agent()->AsyncTaskCanceled(reinterpret_cast<void*>(taskId));
+  invokeAsyncTaskFnWithId(&Agent::AsyncTaskCanceled, args);
 }
 
 static void AsyncTaskStartedWrapper(const FunctionCallbackInfo<Value>& args) {
-  Environment* env = Environment::GetCurrent(args);
-
-  if (!args[0]->IsNumber())
-    return env->ThrowTypeError("first argument must be a number");
-
-  intptr_t taskId = args[0].As<Integer>()->Value();
-  env->inspector_agent()->AsyncTaskStarted(reinterpret_cast<void*>(taskId));
+  invokeAsyncTaskFnWithId(&Agent::AsyncTaskStarted, args);
 }
 
 static void AsyncTaskFinishedWrapper(const FunctionCallbackInfo<Value>& args) {
+  invokeAsyncTaskFnWithId(&Agent::AsyncTaskFinished, args);
+}
+
+static void invokeAsyncTaskFnWithId(void (Agent::*asyncTaskFn)(void*),
+                                    const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
   if (!args[0]->IsNumber())
-    return env->ThrowTypeError("first argument must be a number");
+    return env->ThrowTypeError("taskId must be a number");
 
-  intptr_t taskId = args[0].As<Integer>()->Value();
-  env->inspector_agent()->AsyncTaskFinished(reinterpret_cast<void*>(taskId));
+  intptr_t task_id = args[0].As<Integer>()->Value();
+  (env->inspector_agent()->*asyncTaskFn)(reinterpret_cast<void*>(task_id));
 }
 
 // static
