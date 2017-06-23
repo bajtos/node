@@ -751,7 +751,7 @@ void Url(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(OneByteString(env->isolate(), url.c_str()));
 }
 
-static void invokeAsyncTaskFnWithId(void (Agent::*asyncTaskFn)(void*),
+static void InvokeAsyncTaskFnWithId(void (Agent::*asyncTaskFn)(void*),
                                     const FunctionCallbackInfo<Value>& args);
 
 static void* GetAsyncTask(intptr_t asyncId);
@@ -778,18 +778,18 @@ static void AsyncTaskScheduledWrapper(const FunctionCallbackInfo<Value>& args) {
 }
 
 static void AsyncTaskCanceledWrapper(const FunctionCallbackInfo<Value>& args) {
-  invokeAsyncTaskFnWithId(&Agent::AsyncTaskCanceled, args);
+  InvokeAsyncTaskFnWithId(&Agent::AsyncTaskCanceled, args);
 }
 
 static void AsyncTaskStartedWrapper(const FunctionCallbackInfo<Value>& args) {
-  invokeAsyncTaskFnWithId(&Agent::AsyncTaskStarted, args);
+  InvokeAsyncTaskFnWithId(&Agent::AsyncTaskStarted, args);
 }
 
 static void AsyncTaskFinishedWrapper(const FunctionCallbackInfo<Value>& args) {
-  invokeAsyncTaskFnWithId(&Agent::AsyncTaskFinished, args);
+  InvokeAsyncTaskFnWithId(&Agent::AsyncTaskFinished, args);
 }
 
-static void invokeAsyncTaskFnWithId(void (Agent::*asyncTaskFn)(void*),
+static void InvokeAsyncTaskFnWithId(void (Agent::*asyncTaskFn)(void*),
                                     const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
