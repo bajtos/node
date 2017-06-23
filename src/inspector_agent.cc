@@ -754,6 +754,8 @@ void Url(const FunctionCallbackInfo<Value>& args) {
 static void invokeAsyncTaskFnWithId(void (Agent::*asyncTaskFn)(void*),
                                     const FunctionCallbackInfo<Value>& args);
 
+static void* GetAsyncTask(intptr_t asyncId);
+
 static void AsyncTaskScheduledWrapper(const FunctionCallbackInfo<Value>& args) {
   Environment* env = Environment::GetCurrent(args);
 
@@ -769,7 +771,7 @@ static void AsyncTaskScheduledWrapper(const FunctionCallbackInfo<Value>& args) {
   StringView taskNameView(*taskNameValue, taskNameValue.length());
 
   intptr_t task_id = args[1].As<Integer>()->Value();
-  void* task = reinterpret_cast<void*>(task_id);
+  void* task = GetAsyncTask(task_id);
   bool recurring = args[2].As<Boolean>()->Value();
 
   env->inspector_agent()->AsyncTaskScheduled(taskNameView, task, recurring);
@@ -795,7 +797,14 @@ static void invokeAsyncTaskFnWithId(void (Agent::*asyncTaskFn)(void*),
     return env->ThrowTypeError("taskId must be a number");
 
   intptr_t task_id = args[0].As<Integer>()->Value();
-  (env->inspector_agent()->*asyncTaskFn)(reinterpret_cast<void*>(task_id));
+  (env->inspector_agent()->*asyncTaskFn)(GetAsyncTask(task_id));
+}
+
+static void* GetAsyncTask(intptr_t asyncId) {
+  // The inspector assumes that when other clients use its asyncTask* API,
+  // they use real pointers, our at least something aligned like real pointer.
+  // In general it means that our task_id should always be even.
+  return reinterpret_cast<void*>(asyncId << 1);
 }
 
 // static
