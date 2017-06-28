@@ -535,6 +535,48 @@ exports.startNodeForInspectorTest = function(callback,
   process.on('exit', handler);
   process.on('uncaughtException', handler);
   process.on('SIGINT', handler);
+
+  return child;
+};
+
+exports.startNodeAndDebuggerViaSignal = function(callback, scriptContents) {
+  const args = ['-e', `${scriptContents}\nconsole.error('started');`];
+
+  const child = spawn(process.execPath, args);
+
+  const timeoutId = timeout('Child process did not start properly', 5);
+
+  let started = false;
+  let harness = null;
+
+  const dataCallback = makeBufferingDataCallback((text) => {
+    clearTimeout(timeoutId);
+    console.log('[err]', text);
+    if (harness && started) return;
+    const startMatched = /^started$/.test(text);
+    if (startMatched && !started) {
+      process._debugProcess(child.pid);
+      started = true;
+    }
+
+    const match = text.match(/Debugger listening on ws:\/\/.+:(\d+)\/.+/);
+    if (match && !harness) {
+      harness = new Harness(match[1], child);
+    }
+
+    if (started && harness) {
+      child.stderr.removeListener('data', dataCallback);
+      callback(new Harness(match[1], child));
+    }
+  });
+
+  child.stderr.on('data', dataCallback);
+
+  const handler = tearDown.bind(null, child);
+
+  process.on('exit', handler);
+  process.on('uncaughtException', handler);
+  process.on('SIGINT', handler);
 };
 
 exports.mainScriptSource = function() {
@@ -549,12 +591,16 @@ exports.debugScriptAndAssertPausedMessage = function(script, assertFn) {
   this.startNodeForInspectorTest(runTests, '--inspect-brk', script);
 
   function runTests(harness) {
-    harness.runFrontendSession([
-      setupDebugger,
-      (session) => session.expectMessages(debuggerPaused).disconnect(true)
-    ])
-      .kill();
+    exports.setupDebuggerAndAssertPausedMessage(harness, assertFn);
+    harness.kill();
   }
+};
+
+exports.setupDebuggerAndAssertPausedMessage = function(harness, assertFn) {
+  harness.runFrontendSession([
+    setupDebugger,
+    (session) => session.expectMessages(debuggerPaused).disconnect(true)
+  ]);
 
   function setupDebugger(session) {
     session.sendInspectorCommands([
