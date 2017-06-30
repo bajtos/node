@@ -21,6 +21,8 @@
 namespace node {
 namespace inspector {
 namespace {
+using node::FatalError;
+
 using v8::Boolean;
 using v8::Context;
 using v8::External;
@@ -36,6 +38,7 @@ using v8::NewStringType;
 using v8::Object;
 using v8::Persistent;
 using v8::String;
+using v8::Undefined;
 using v8::Value;
 
 using v8_inspector::StringBuffer;
@@ -563,7 +566,8 @@ class NodeInspectorClient : public v8_inspector::V8InspectorClient {
 Agent::Agent(Environment* env) : parent_env_(env),
                                  client_(nullptr),
                                  platform_(nullptr),
-                                 enabled_(false) {}
+                                 enabled_(false),
+                                 jsland_should_enable_async_hook_(false) {}
 
 // Destructor needs to be defined here in implementation file as the header
 // does not have full definition of some classes.
@@ -641,7 +645,21 @@ void Agent::Stop() {
 }
 
 void Agent::Connect(InspectorSessionDelegate* delegate) {
+  fprintf(stderr, "Agent::Connect\n");
   enabled_ = true;
+
+  if (enable_async_hook_function_.IsEmpty()) {
+    jsland_should_enable_async_hook_ = true;
+  } else {
+    jsland_should_enable_async_hook_ = false;
+    if (enable_async_hook_function_->Call(parent_env_->context(),
+          Undefined(parent_env_->isolate()), 0, nullptr).IsEmpty()) {
+      FatalError(
+          "node::InspectorAgent::Start",
+          "Cannot enable Inspector's AsyncHook, please report this.");
+    }
+  }
+
   client_->connectFrontend(delegate);
 }
 
@@ -670,7 +688,19 @@ void Agent::Dispatch(const StringView& message) {
 }
 
 void Agent::Disconnect() {
+  fprintf(stderr, "Agent::Disconnect\n");
   CHECK_NE(client_, nullptr);
+
+  jsland_should_enable_async_hook_ = false;
+  if (!disable_async_hook_function_.IsEmpty()) {
+    if (disable_async_hook_function_->Call(parent_env_->context(),
+      Undefined(parent_env_->isolate()), 0, nullptr).IsEmpty()) {
+        FatalError(
+          "node::InspectorAgent::Stop",
+          "Cannot disable Inspector's AsyncHook, please report this.");
+      }
+  }
+
   client_->disconnectFrontend();
 }
 
@@ -796,6 +826,20 @@ static void* GetAsyncTask(intptr_t asyncId) {
   return reinterpret_cast<void*>(asyncId << 1);
 }
 
+static void RegisterAsyncHookWrapper(const FunctionCallbackInfo<Value>& args) {
+  Environment* env = Environment::GetCurrent(args);
+
+  v8::Local<v8::Function> enable_function = args[0].As<Function>();
+  v8::Local<v8::Function> disable_function = args[1].As<Function>();
+  env->inspector_agent()->RegisterAsyncHook(enable_function, disable_function);
+}
+
+static void ShouldEnableAsyncHook(const FunctionCallbackInfo<Value>& args) {
+  Environment* env = Environment::GetCurrent(args);
+  bool result = env->inspector_agent()->jsland_should_enable_async_hook();
+  args.GetReturnValue().Set(result);
+}
+
 // static
 void Agent::InitInspector(Local<Object> target, Local<Value> unused,
                           Local<Context> context, void* priv) {
@@ -812,6 +856,8 @@ void Agent::InitInspector(Local<Object> target, Local<Value> unused,
   env->SetMethod(target, "asyncTaskCanceled", AsyncTaskCanceledWrapper);
   env->SetMethod(target, "asyncTaskStarted", AsyncTaskStartedWrapper);
   env->SetMethod(target, "asyncTaskFinished", AsyncTaskFinishedWrapper);
+  env->SetMethod(target, "registerAsyncHook", RegisterAsyncHookWrapper);
+  env->SetMethod(target, "jslandShouldEnableAsyncHook", ShouldEnableAsyncHook);
 }
 
 void Agent::RequestIoThreadStart() {

@@ -16,17 +16,7 @@ namespace node {
 class Environment;
 }  // namespace node
 
-namespace v8 {
-class Context;
-template <typename V>
-class FunctionCallbackInfo;
-template<typename T>
-class Local;
-class Message;
-class Object;
-class Platform;
-class Value;
-}  // namespace v8
+#include "v8.h"
 
 namespace v8_inspector {
 class StringView;
@@ -75,6 +65,16 @@ class Agent {
   void AsyncTaskFinished(void* task);
   void AllAsyncTasksCanceled();
 
+  inline void RegisterAsyncHook(v8::Local<v8::Function> enable_function,
+                                v8::Local<v8::Function> disable_function) {
+    enable_async_hook_function_ = enable_function;
+    disable_async_hook_function_ = disable_function;
+  }
+
+  inline bool jsland_should_enable_async_hook() const {
+    return jsland_should_enable_async_hook_;
+  }
+
   // These methods are called by the WS protocol and JS binding to create
   // inspector sessions.  The inspector responds by using the delegate to send
   // messages back.
@@ -113,6 +113,10 @@ class Agent {
   bool enabled_;
   std::string path_;
   DebugOptions debug_options_;
+
+  v8::Local<v8::Function> enable_async_hook_function_;
+  v8::Local<v8::Function> disable_async_hook_function_;
+  bool jsland_should_enable_async_hook_;
 };
 
 }  // namespace inspector
