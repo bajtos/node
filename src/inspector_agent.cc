@@ -960,6 +960,24 @@ static void IsEnabled(const FunctionCallbackInfo<Value>& args) {
   args.GetReturnValue().Set(env->inspector_agent()->enabled());
 }
 
+static void SetAsyncCallStackDepth(const FunctionCallbackInfo<Value>& args) {
+  Environment* env = Environment::GetCurrent(args);
+  CHECK(args[0]->IsNumber());
+  const int depth = args[0]->IntegerValue(env->context()).FromJust();
+
+  //V8InspectorImpl* inspector = env->inspector_agent();
+  //env->inspector_agent()->SetAsyncCallStackDepth(V8DebuggerAgentImpl, depth);
+  std::ostringstream msg;
+  msg << "{"
+    "  \"method\": \"Debugger.setAsyncCallStackDepth\", "
+    "  \"params\": {\"maxDepth\": " << depth << "}"
+    "}";
+  fprintf(stderr, "dispatch %s\n", msg.str().c_str());
+  const StringView v8msg(reinterpret_cast<const uint8_t*>(msg.str().c_str()),
+                         msg.str().size());
+  env->inspector_agent()->Dispatch(v8msg);
+}
+
 // static
 void Agent::InitInspector(Local<Object> target, Local<Value> unused,
                           Local<Context> context, void* priv) {
@@ -990,6 +1008,7 @@ void Agent::InitInspector(Local<Object> target, Local<Value> unused,
 
   env->SetMethod(target, "registerAsyncHook", RegisterAsyncHookWrapper);
   env->SetMethod(target, "isEnabled", IsEnabled);
+  env->SetMethod(target, "setAsyncCallStackDepth", SetAsyncCallStackDepth);
 }
 
 void Agent::RequestIoThreadStart() {

@@ -6,47 +6,35 @@ common.crashOnUnhandledRejection();
 const { NodeInstance } = require('../inspector/inspector-helper.js');
 const assert = require('assert');
 
-// Even with --inspect, the default async call stack depth is 0. We need a
-// chance to call Debugger.setAsyncCallStackDepth *before* activating the timer
-// for async stack traces to work.
-const script = `
-process._rawDebug('Waiting until the inspector is activated...');
-const waiting = setInterval(() => { debugger; }, 50);
-
-// This function is called by the inspector client (session)
-function setupTimeoutWithBreak() {
-  clearInterval(waiting);
-  process._rawDebug('Debugger ready, setting up timeout with a break');
-  setTimeout(() => { debugger; }, 50);
+const script = `start();
+function start() {
+  setInterval(() => {
+    debugger;
+  }, 50);
+  process._rawDebug('started');
 }
 `;
 
-async function waitForInitialSetup(session) {
-  console.error('[test]', 'Waiting for initial setup');
-  await session.waitForBreakOnLine(2, '[eval]');
-}
-
-async function setupTimeoutForStackTrace(session) {
-  console.error('[test]', 'Setting up timeout for async stack trace');
-  await session.send([
-    { 'method': 'Runtime.evaluate',
-      'params': { expression: 'setupTimeoutWithBreak()' } },
-    { 'method': 'Debugger.resume' }
-  ]);
+async function waitUntilStarted(instance) {
+  const msg = 'Timed out waiting for process to start';
+  const timeout = common.platformTimeout(1000);
+  while (await common.fires(instance.nextStderrString(), msg, timeout) !==
+           'started') {}
 }
 
 async function checkAsyncStackTrace(session) {
-  console.error('[test]', 'Verify basic properties of asyncStackTrace');
-  const paused = await session.waitForBreakOnLine(8, '[eval]');
+  const paused = await session.waitForBreakOnLine(3, '[eval]');
   assert(paused.params.asyncStackTrace,
          `${Object.keys(paused.params)} contains "asyncStackTrace" property`);
   assert(paused.params.asyncStackTrace.description, 'Timeout');
   assert(paused.params.asyncStackTrace.callFrames
-           .some((frame) => frame.functionName === 'setupTimeoutWithBreak'));
+           .some((frame) => frame.functionName === 'start'));
 }
 
 async function runTests() {
   const instance = new NodeInstance(['--inspect=0'], script);
+  await waitUntilStarted(instance);
+
   const session = await instance.connectInspectorSession();
   await session.send([
     { 'method': 'Runtime.enable' },
@@ -58,8 +46,6 @@ async function runTests() {
     { 'method': 'Runtime.runIfWaitingForDebugger' }
   ]);
 
-  await waitForInitialSetup(session);
-  await setupTimeoutForStackTrace(session);
   await checkAsyncStackTrace(session);
 
   console.error('[test]', 'Stopping child instance');
